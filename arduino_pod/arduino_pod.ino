@@ -1,9 +1,5 @@
-// Wire Slave Receiver
-// by Nicholas Zambetti <http://www.zambetti.com>
-
-// Demonstrates use of the Wire library
-// Receives data as an I2C/TWI slave device
 #include <Wire.h>
+#include <CRC.h> // https://github.com/RobTillaart/CRC
 
 #define ADDR_SELECT A0
 #define I2C_ADDR 8
@@ -21,7 +17,7 @@ public:
     debounce_time = d;
     pinMode(pin, INPUT_PULLUP);
   }
-
+  int get_state() { return state; }
   int read();
 private:
   void init() {
@@ -35,6 +31,7 @@ private:
 };
 
 struct cmd_t {
+  uint32_t ts;
   uint16_t type;
   uint16_t len;
   // char *data;
@@ -50,14 +47,21 @@ enum state_t {
   STATE_RUNNING
 };
 
-char rec_buf[128];
+char rec_buf[128];  
 int blink_delay = 500;
 
 input_t inputs[5];
 
 #define num_sens() sizeof(inputs)/sizeof(inputs[0])
 
+void led_setup();
+void led_loop(int i, int val);
+void led_delay();
+
 void setup() {
+  delay(1000); // power-up safety delay (used in some of the fastled example code)
+  led_setup();
+
   pinMode(ADDR_SELECT, INPUT_PULLUP);
   
   if(digitalRead(ADDR_SELECT)) {
@@ -77,13 +81,12 @@ void setup() {
 
 void loop() {
   // Read and debounce
-  for(int i=0; i<num_sens(); i++)
+  for(int i=0; i<num_sens(); i++) {
     inputs[i].read();
-    
-  // Update LEDs?
-  
-  delay(50);
+    led_loop(i, inputs[i].get_state());
+  }
 
+  led_delay();
   blink();
 }
 
@@ -110,7 +113,7 @@ void on_receive(int num) {
 
 void send_init() {
   cmd_t c;
-  
+  c.ts = millis();
   c.type = 0;
   c.len = 5;
 
@@ -120,19 +123,27 @@ void send_init() {
 
 void send_state() {
   static int vals[num_sens()];
+  static uint8_t buf[20];
 
-  Serial.print(millis()); Serial.print(": ");
-  for(int i=0; i<num_sens(); i++) {
-    vals[i] = inputs[i].read();
-    Serial.print(vals[i]); Serial.print("\t");
-  }
-  Serial.println();
+  memset(buf, 0, sizeof(buf));
   
   cmd_t c;
+  c.ts = millis();
   c.type = 1;
-  c.len = sizeof(vals); 
-  Wire.write((char*)&c, sizeof(c));
-  Wire.write((char*)vals, sizeof(vals));
+  c.len = sizeof(vals);
+
+  memcpy(buf, &c, sizeof(c));
+  int boff = sizeof(c);
+  
+  for(int i=0; i<num_sens(); i++) {
+    *(int*)&buf[boff] = inputs[i].get_state();
+    boff += sizeof(int);
+  }
+
+  uint16_t cs = crc16(buf, sizeof(buf)-2);
+  *(uint16_t*)&buf[boff] = cs;
+
+  Wire.write(buf, sizeof(buf));
 }
 
 void on_request() {
