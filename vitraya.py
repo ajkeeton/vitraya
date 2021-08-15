@@ -8,6 +8,7 @@ import argparse
 
 DEFAULT_HOST="192.168.0.30:9999"
 TIMEOUT=10
+NUM_SENS_PER_ARD = 5
 
 def test_mode(host, conf):
     from testing import generator
@@ -47,7 +48,8 @@ def client(host, on_change):
                 sock.sendall(bytes("hello\n", 'ascii'))
 
                 while True:
-                    _client(sock, on_change)
+                    if not _client(sock, on_change):
+                        break
 
         except socket.timeout:
             print("Timed out, reconnecting...")
@@ -57,8 +59,8 @@ def _client(sock, on_change):
     data = str(sock.recv(1024), 'ascii')
     if len(data) == 0:
         print("Server returned 0 bytes")
-        time.sleep(0.01)
-        return
+        time.sleep(0.1)
+        return False
 
     print("Received: {}".format(data))
     updates = data.split('|')
@@ -66,20 +68,24 @@ def _client(sock, on_change):
     if len(updates) <= 1:
         # Missing a |
         # discard
-        return
+        return True
 
     for u in updates:
         toks = u.split(",")
-        if len(toks) != 2:
+        if len(toks) != NUM_SENS_PER_ARD + 1:
             break
-        idx, val = toks
-    
-        if val == "0":
-            val = False
-        if val == "1":
-            val = True
 
-        on_change(int(idx), val)
+        idx = int(toks[0])
+        state = [int(t) for t in toks[1:]]
+    
+        #if val == "0":
+        #    val = False
+        #if val == "1":
+        #    val = True
+
+        on_change(int(idx), state)
+    
+    return True
 
 def midi_client(host, conf):
     # connect to server and receive midi signals

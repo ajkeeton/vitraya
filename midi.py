@@ -26,18 +26,35 @@ cc_numbers = [
 class KnobState:
     def __init__(self):
         self.triggered = False
-        self.val = 1
+        self.last_ts = time.time()
+
+        self.attack = 100
+        self.decay = 200
+        self.min = 1
+        self.max = 127
+
+        self.val = self.min
 
     def poke(self):
-        if self.triggered:
-            self.val += 1
-        else:
-            self.val -= 2
+        now = time.time() 
+        delt = now - self.last_ts
+        last = self.val
 
-        if self.val > 127:
-            self.val = 127
-        elif self.val < 1:
-            self.val = 1
+        if self.triggered:
+            self.val += delt * self.attack
+        else:
+            self.val -= delt * self.decay
+
+        if self.val > self.max:
+            self.val = self.max
+        elif self.val < self.min:
+            self.val = self.min
+
+        self.last_ts = now
+        if int(self.val) != int(last):
+            return True
+
+        return False
 
 class MidiState:
     def __init__(self):
@@ -46,14 +63,16 @@ class MidiState:
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
 
-    def on_update(self, i, v):
+    def on_update(self, ard, state):
         with self.mtx:
-            if i not in self.last:
-                self.last[i] = KnobState()
-            if v:
-                self.last[i].triggered = True
-            else:
-                self.last[i].triggered = False
+            if ard not in self.last:
+                self.last[ard] = [KnobState() for _ in state]
+
+            for i,v in enumerate(state):
+                if v:
+                    self.last[ard][i].triggered = True
+                else:
+                    self.last[ard][i].triggered = False
 
         if len(self.last) > 16:
             raise Exception("Too many sensor inputs")
@@ -61,25 +80,22 @@ class MidiState:
     def run(self):
         while True:
             self._run()
-            time.sleep(0.01)
+            time.sleep(0.005)
 
     def _run(self):
-        update = False
-        with self.mtx:
-            for i,l in self.last.items():
-                if l.triggered and l.val >= 1 and l.val <= 127:
-                    update = True
-                l.poke()
-
-        if not update:
-            return
+        pending = []
 
         with self.mtx:
-            for k,v in self.last.items():
-                msg = mido.Message('control_change', 
-                    control=0x35,
-                    channel=k,
-                    value=v.val)
+            for i,knobs in self.last.items():
+                for j,k in enumerate(knobs):
+                    if k.poke():
+                        pending += [(j,k.val)]
+
+        for (i,v) in pending:
+            msg = mido.Message('control_change', 
+                control=0x35,
+                channel=i,
+                value=int(v))
 
             m.send(msg)
 
