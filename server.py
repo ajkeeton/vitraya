@@ -25,7 +25,8 @@ class handler(socketserver.StreamRequestHandler):
                 return
 
     def send(self, idx, val):
-        msg = f"{idx},{val}|"
+        v1,v2,v3,v4,v5 = val
+        msg = f"{idx},{v1},{v2},{v3},{v4},{v5}|"
         self.wfile.write(bytes(msg, 'utf-8'))
         
     def parse_exec(self, cmd):
@@ -59,7 +60,6 @@ class Server(socketserver.ThreadingTCPServer):
 
         with self.mtx:
             self.state[idx] = state
-
             for c,_ in self.conns.items():
                 try:
                     c.send(idx, state)
@@ -70,7 +70,7 @@ class Server(socketserver.ThreadingTCPServer):
                     closed += [c]
 
             for _,c in enumerate(closed):
-                del self.conns[o]
+                del self.conns[c]
 
     def register(self, o):
         with self.mtx:
