@@ -1,12 +1,6 @@
-import yaml
-from models.models import Sensor
 import sqlite3
 
 con = sqlite3.connect('conf.db')
-
-#def load():
-#    confs = yaml.load(open('configs/1.yaml','r'), Loader=yaml.Loader)
-#    return [ Sensor(c) for c in confs['sensors'] ]
 
 def make_sensor(row):
     return [{

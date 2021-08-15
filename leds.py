@@ -55,7 +55,8 @@ def throtlog(msg):
 
 class LEDs:
     def __init__(self, conf, verbose=False):
-        self.leds = [LED(c) for c in conf]
+        # XXX
+        self.leds = [] #[LED(c) for c in conf]
         self.last = time.time()
         self.mtx = threading.Lock()
         self.thread = threading.Thread(target=self.run, daemon=True)

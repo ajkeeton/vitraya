@@ -9,6 +9,7 @@ class handler(socketserver.StreamRequestHandler):
 
     def handle(self):
         self.server.register(self)
+        print("Someone connected...")
         while True:
             try:
                 # self.request is the TCP socket connected to the client
@@ -50,7 +51,7 @@ class Server(socketserver.ThreadingTCPServer):
         self.serve_forever()
 
     def on_change(self, idx, state):
-        print(idx, state)
+        print("Server on_change:", idx, state)
 
         closed = []
         self.mtx.acquire()
