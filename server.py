@@ -18,7 +18,7 @@ class handler(socketserver.StreamRequestHandler):
                     print("{} wrote: {}".format(self.client_address[0], data))
                     self.parse_exec(data)
                 else:
-                    time.sleep(.1)
+                    time.sleep(0.01)
             except ConnectionResetError as e:
                 print("Connection reset:", self.client_address[0])
                 self.server.unregister(self)
@@ -41,6 +41,8 @@ class handler(socketserver.StreamRequestHandler):
 class Server(socketserver.ThreadingTCPServer):
     def __init__(self, host, conf):
         host,port = host.split(":")
+
+        socketserver.ThreadingTCPServer.allow_reuse_address = True
         socketserver.ThreadingTCPServer.__init__(self, (host, int(port)), handler)
         self.sens = conf
         self.conns = {}
@@ -54,34 +56,29 @@ class Server(socketserver.ThreadingTCPServer):
         print("Server on_change:", idx, state)
 
         closed = []
-        self.mtx.acquire()
-        self.state[idx] = state
 
-        for c,_ in self.conns.items():
-            try:
-                c.send(idx, state)
-            except ConnectionResetError:
-                closed += [c]
-            except Exception as e:
-                print("Failed to write to {}: {}".format(c.client_address[0], e))
-                closed += [c]
+        with self.mtx:
+            self.state[idx] = state
 
-        self.mtx.release()
+            for c,_ in self.conns.items():
+                try:
+                    c.send(idx, state)
+                except ConnectionResetError:
+                    closed += [c]
+                except Exception as e:
+                    print("Failed to write to {}: {}".format(c.client_address[0], e))
+                    closed += [c]
 
-        for _,k in enumerate(closed):
-            self.unregister(c)
+            for _,c in enumerate(closed):
+                del self.conns[o]
 
     def register(self, o):
-        self.mtx.acquire()
-        self.conns[o] = True
-        self.mtx.release()
+        with self.mtx:
+            self.conns[o] = True
 
     def unregister(self, o):
-        self.mtx.acquire()
-
-        try:
-            del self.conns[o]
-        except KeyError:
-            return
-        finally:
-            self.mtx.release()
+        with self.mtx:
+            try:
+                del self.conns[o]
+            except KeyError:
+                return
