@@ -1,8 +1,9 @@
 #include <FastLED.h>
 
-#define LED_PIN     12
+#define LED_PIN     10
 #define NUM_LEDS    12
-#define BRIGHTNESS  255
+#define MIN_BRIGHT  3
+#define MAX_BRIGHT  255
 #define LED_TYPE    WS2811
 #define COLOR_ORDER RGB
 CRGB leds[NUM_LEDS];
@@ -21,28 +22,31 @@ void new_palette();
 void led_setup() {
   
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip);
-  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setBrightness(MAX_BRIGHT);
   
-  currentPalette = RainbowColors_p;
+  //currentPalette = RainbowColors_p;
+  //currentPalette = CloudColors_p;
+  currentPalette = PartyColors_p;
   currentBlending = LINEARBLEND;
 }
 
 void led_loop(int idx, int val) {
-  if(idx != 0) return;
+  // if(idx != 0) return;
   
   static int startIndex = 0;
-  static uint8_t brightness = 4;
+  static uint8_t brightness = MIN_BRIGHT;
   static bool triggered = false;
 
   if(!val) {
-    if(brightness > 4)
-      brightness -= 2;
+    if(brightness > MIN_BRIGHT)
+      brightness -= 3;
     triggered = false;
   }
   else {
-    if(brightness == BRIGHTNESS) {
+    if(brightness >= MAX_BRIGHT) {
        if(triggered) {
-        new_palette();
+        //new_palette();
+        // XXX Do something interesting ... flash?
         triggered = false;
        }
     }
@@ -52,6 +56,9 @@ void led_loop(int idx, int val) {
     }
   }
 
+  if(brightness < MIN_BRIGHT)
+    brightness = MIN_BRIGHT;
+    
   startIndex++;
 
   FillLEDsFromPaletteColors(startIndex, brightness);

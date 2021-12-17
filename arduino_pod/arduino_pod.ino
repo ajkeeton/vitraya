@@ -50,7 +50,7 @@ enum state_t {
 char rec_buf[128];  
 int blink_delay = 500;
 
-input_t inputs[5];
+input_t inputs[4];
 
 #define num_sens() sizeof(inputs)/sizeof(inputs[0])
 
@@ -71,8 +71,13 @@ void setup() {
       blink_delay = 250;
   }
 
-  for(int i=0; i<num_sens(); i++)
-    inputs[i] = input_t(i+2);
+  //for(int i=0; i<num_sens(); i++)
+  //  inputs[i] = input_t(A0+i);//input_t(i+2);
+  
+  inputs[0] = input_t(A3);//input_t(i+2);
+  inputs[1] = input_t(A2);//input_t(i+2);
+  inputs[2] = input_t(A1);//input_t(i+2);
+  inputs[3] = input_t(A0);//input_t(i+2);
 
   Wire.onReceive(on_receive);
   Wire.onRequest(on_request);
@@ -81,10 +86,15 @@ void setup() {
 
 void loop() {
   // Read and debounce
-  for(int i=0; i<num_sens(); i++) {
+  for(int i=0; i<num_sens(); i++)
     inputs[i].read();
-    led_loop(i, inputs[i].get_state());
-  }
+  //  led_loop(i, inputs[i].get_state());
+  //}
+
+  led_loop(0, inputs[0].get_state());
+  //led_loop(1, inputs[1].get_state());
+  //led_loop(2, inputs[2].get_state());
+  //led_loop(3, inputs[3].get_state());
 
   led_delay();
   blink();
@@ -176,6 +186,10 @@ int input_t::read()
   if(now - last_val_time > debounce_time) {
     state = val;
   }
+
+  Serial.print(pin);
+  Serial.print(": ");
+  Serial.println(val);
 
   last_val = val;
   return state;
